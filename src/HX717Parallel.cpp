@@ -40,28 +40,32 @@
 // - https://github.com/bogde/HX711/issues/75
 // - https://github.com/arduino/Arduino/issues/6561
 // - https://community.hiveeyes.org/t/using-bogdans-canonical-hx711-library-on-the-esp32/539
-void shiftInSlow(uint8_t *dataPin, uint8_t *clockPin, uint8_t *resultOffset, uint8_t bitOrder, byte count) {
+void shiftInSlow(uint8_t *dataPin, uint8_t *clockPin, uint8_t *resultOffset, uint8_t bitOrder, byte count, uint8_t *toRead) {
     
     
     
     for(uint8_t i = 0; i < 8; ++i) {
         
         for (byte j = 0; j < count; j++) {
-            digitalWrite(clockPin[j], HIGH);
+            if(toRead[j] == 1) {
+                digitalWrite(clockPin[j], HIGH);
+            }
         }
         delayMicroseconds(1);
 
         for (byte j = 0; j < count; j++) {
-            if(bitOrder == LSBFIRST)
-                resultOffset[j*count] |= digitalRead(dataPin[j]) << i;
-            else
-                resultOffset[j*count] |= digitalRead(dataPin[j]) << (7 - i);
-            digitalWrite(clockPin[j], LOW);
+            if(toRead[j] == 1) {
+                if(bitOrder == LSBFIRST)
+                    resultOffset[j*count] |= digitalRead(dataPin[j]) << i;
+                else
+                    resultOffset[j*count] |= digitalRead(dataPin[j]) << (7 - i);
+                digitalWrite(clockPin[j], LOW);    
+            }
         }
         delayMicroseconds(1);
     }
 }
-#define SHIFTIN_WITH_SPEED_SUPPORT(data,clock,result,order,count) shiftInSlow(data,clock,result,order,count)
+#define SHIFTIN_WITH_SPEED_SUPPORT(data,clock,result,order,count, toRead) shiftInSlow(data,clock,result,order,count, toRead)
 #else
 #define SHIFTIN_WITH_SPEED_SUPPORT(data,clock,order) shiftIn(data,clock,order)
 #endif
@@ -113,6 +117,9 @@ bool HX717Parallel::is_ready() {
     return true;
 }
 
+// temp/hacky
+uint32_t readCounter[4] = {0, 0, 0, 0};
+
 
 void HX717Parallel::read(long *result) {
 
@@ -123,10 +130,7 @@ void HX717Parallel::read(long *result) {
 	uint8_t *data = (uint8_t *)result; 
 	uint8_t filler = 0x00;
 
-    // set result to 0
-    for (byte i = 0; i < count; i++) {
-        result[i] = 0;
-    }
+    uint8_t toRead[4] = {0};
 
 	// Protect the read sequence from system interrupts.  If an interrupt occurs during
 	// the time the PD_SCK signal is high it will stretch the length of the clock pulse.
@@ -166,44 +170,66 @@ void HX717Parallel::read(long *result) {
 
     // shift in 3 bytes for all HX717s
     // for (byte i = 0; i < 3; i++) {
+    
 
-#if BYTE_ORDER == LITTLE_ENDIAN
-      // Little endian system
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[2], MSBFIRST, count);
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[1], MSBFIRST, count);
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[0], MSBFIRST, count);
-#else
-    // throw compile error
-    #error "Byte order not supported"
-
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[1], MSBFIRST, count);
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[2], MSBFIRST, count);
-    SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[3], MSBFIRST, count);
-  // Endianness unknown or unsupported preprocessor directive
-#endif
-
-
-
-    // }
-
-	// Set the channel and the gain factor for the next reading using the clock pin.
-	for (unsigned int i = 0; i < 1; i++) {
-
-        for (byte j = 0; j < count; j++) {
-            digitalWrite(pd_sck[j], HIGH);
+    bool somethingToRead = false;
+    // read from the HX717s where dout is low
+    for (byte i = 0; i < count; i++) {
+        if (digitalRead(dout[i]) == LOW) {
+            toRead[i] = 1;
+            readCounter[i]++;
+            somethingToRead = true;
+            result[i] = 0;
         }
-		#if ARCH_ESPRESSIF
-		delayMicroseconds(1);
-		#endif
-		
-        for (byte j = 0; j < count; j++) {
-            digitalWrite(pd_sck[j], LOW);
+    }
+
+    if (somethingToRead) {
+
+    #if BYTE_ORDER == LITTLE_ENDIAN
+        // Little endian system
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[2], MSBFIRST, count, toRead);
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[1], MSBFIRST, count, toRead);
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[0], MSBFIRST, count, toRead);
+    #else
+        // throw compile error
+        #error "Byte order not supported"
+
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[1], MSBFIRST, count);
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[2], MSBFIRST, count);
+        SHIFTIN_WITH_SPEED_SUPPORT(dout, pd_sck, &data[3], MSBFIRST, count);
+    // Endianness unknown or unsupported preprocessor directive
+    #endif
+
+
+
+        // }
+
+        // Set the channel and the gain factor for the next reading using the clock pin.
+        for (unsigned int i = 0; i < 1; i++) {
+
+            for (byte j = 0; j < count; j++) {
+                if (toRead[j] == 1) {
+                    digitalWrite(pd_sck[j], HIGH);
+                }
+            }
+            #if ARCH_ESPRESSIF
+            delayMicroseconds(1);
+            #endif
+            
+            for (byte j = 0; j < count; j++) {
+                if (toRead[j] == 1) {
+                    digitalWrite(pd_sck[j], LOW);
+                }
+            }
+            
+            #if ARCH_ESPRESSIF
+            delayMicroseconds(1);
+            #endif
         }
-        
-		#if ARCH_ESPRESSIF
-		delayMicroseconds(1);
-		#endif
-	}
+    }
+
+
+
 
 	#if IS_FREE_RTOS
 	// End of critical section.
