@@ -84,7 +84,7 @@ HX717Parallel::HX717Parallel() {
 HX717Parallel::~HX717Parallel() {
 }
 
-void HX717Parallel::begin(byte *_dout, byte *_pd_sck, long *_offset, float *_scale, const byte _count) {
+void HX717Parallel::begin(byte *_dout, byte *_pd_sck, int32_t *_offset, float *_scale, const byte _count) {
 
     // Initialize library with data output pin, clock input pin and gain factor.
 

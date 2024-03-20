@@ -22,7 +22,7 @@ class HX717Parallel
 		byte *pd_sck;	// Power Down and Serial Clock Input Pin
 		byte *dout;		// Serial Data Output Pin
 		byte *gain;		// amplification factor
-		long *offset;	// used for tare weight
+		int32_t *offset;	// used for tare weight
 		float *scale;	// used to return weight in grams, kg, ounces, whatever
         byte count;
 
@@ -37,7 +37,7 @@ class HX717Parallel
 		// - With a gain factor of 64 or 128, channel A is selected
 		// - With a gain factor of 32, channel B is selected
 		// The library default is "128" (Channel A). 
-		void begin(byte *dout, byte *pd_sck, long *offset, float *scale, const byte count);
+		void begin(byte *dout, byte *pd_sck, int32_t *offset, float *scale, const byte count);
 
 		// Check if HX711 is ready
 		// from the datasheet: When output data is not ready for retrieval, digital output pin DOUT is high. Serial clock
