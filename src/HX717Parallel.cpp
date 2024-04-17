@@ -56,9 +56,9 @@ void shiftInSlow(uint8_t *dataPin, uint8_t *clockPin, uint8_t *resultOffset, uin
         for (byte j = 0; j < count; j++) {
             if(toRead[j] == 1) {
                 if(bitOrder == LSBFIRST)
-                    resultOffset[j*count] |= digitalRead(dataPin[j]) << i;
+                    resultOffset[j*4] |= digitalRead(dataPin[j]) << i;
                 else
-                    resultOffset[j*count] |= digitalRead(dataPin[j]) << (7 - i);
+                    resultOffset[j*4] |= digitalRead(dataPin[j]) << (7 - i);
                 digitalWrite(clockPin[j], LOW);    
             }
         }
@@ -180,8 +180,21 @@ void HX717Parallel::read(long *result) {
             readCounter[i]++;
             somethingToRead = true;
             result[i] = 0;
+
+
         }
+
+
+
     }
+
+    // // print if we need to read
+    // Serial.print("toRead: ");
+    // for (byte j = 0; j < count; j++) {
+    //     Serial.print(toRead[j]);
+    //     Serial.print(" ");
+    // }
+    // Serial.println();
 
     if (somethingToRead) {
 
