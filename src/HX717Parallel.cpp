@@ -84,14 +84,14 @@ HX717Parallel::HX717Parallel() {
 HX717Parallel::~HX717Parallel() {
 }
 
-void HX717Parallel::begin(byte *_dout, byte *_pd_sck, int32_t *_offset, float *_scale, const byte _count) {
+void HX717Parallel::begin(byte *_dout, byte *_pd_sck, int32_t *_offset, byte *_gain, const byte _count) {
 
     // Initialize library with data output pin, clock input pin and gain factor.
 
 	dout = _dout;
     pd_sck = _pd_sck;
     offset = _offset;
-    scale = _scale;
+    gain = _gain;
     count = _count;
 
 
@@ -217,11 +217,13 @@ void HX717Parallel::read(long *result) {
 
         // }
 
+        // int gains[4] = {1, 1, 3, 1};
+
         // Set the channel and the gain factor for the next reading using the clock pin.
-        for (unsigned int i = 0; i < 1; i++) {
+        for (unsigned int i = 0; i < 3; i++) {
 
             for (byte j = 0; j < count; j++) {
-                if (toRead[j] == 1) {
+                if (toRead[j] == 1 && gain[j] > i) { // 
                     digitalWrite(pd_sck[j], HIGH);
                 }
             }
@@ -230,7 +232,7 @@ void HX717Parallel::read(long *result) {
             #endif
             
             for (byte j = 0; j < count; j++) {
-                if (toRead[j] == 1) {
+                if (toRead[j] == 1 && gain[j] > i) { // 
                     digitalWrite(pd_sck[j], LOW);
                 }
             }
